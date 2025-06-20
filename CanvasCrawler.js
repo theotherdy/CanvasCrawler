@@ -160,8 +160,8 @@ async function fetchPageBody(courseId, pageUrl) {
 
       // --- Students ---
       const students = await fetchAllStudents(courseId);
-      const studentIds = students.map(s => s.user_id);
-      console.log(`[${courseName}] Found ${studentIds.length} active students`);
+      const studentIds = Array.from(new Set(students.map(s => s.user_id)));
+      console.log(`[${courseName}] Found ${studentIds.length} unique active students`);
 
       // --- Classic Quizzes (Published Only) ---
       const quizzes = await fetchAllPublishedQuizzes(courseId);
