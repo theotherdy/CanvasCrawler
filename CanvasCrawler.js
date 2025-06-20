@@ -143,7 +143,7 @@ async function fetchPageBody(courseId, pageUrl) {
 
 (async () => {
   const courseIds = [
-    262594
+    262596
   ];
   const domain = 'https://canvas.ox.ac.uk';
 
@@ -179,10 +179,16 @@ async function fetchPageBody(courseId, pageUrl) {
         : "N/A";
 
       // --- New Quizzes (Assignments, Published Only) ---
+      // Define the same LTI domain(s) for New Quizzes detection:
+      const newQuizLtiDomains = [
+        'quiz-lti-dub-prod.instructure.com'
+      ];
       const assignments = await fetchAllAssignments(courseId);
       const publishedNewQuizzes = assignments.filter(a =>
-        a.published && (a.submission_types || []).includes('external_tool') &&
-        a.external_tool_url && a.external_tool_url.includes('new_quizzes')
+        a.published &&
+        (a.submission_types || []).includes('external_tool') &&
+        a.external_tool_url &&
+        newQuizLtiDomains.some(domain => a.external_tool_url.includes(domain))
       );
       console.log(`[${courseName}] Found ${publishedNewQuizzes.length} published New Quizzes`);
       let totalStudentNewQuizSubs = 0;
@@ -195,6 +201,29 @@ async function fetchPageBody(courseId, pageUrl) {
       }
       let pctAnsweredNewQuizzes = (publishedNewQuizzes.length && studentIds.length)
         ? ((totalStudentNewQuizSubs / (studentIds.length * publishedNewQuizzes.length)) * 100).toFixed(1)
+        : "N/A";
+
+      // Other published assignments = published, not new quizzes, not classic quizzes
+      const otherAssignments = assignments.filter(a =>
+        a.published &&
+        // Not New Quizzes
+        (!(a.submission_types || []).includes('external_tool') ||
+        !a.external_tool_url ||
+        !newQuizLtiDomains.some(domain => a.external_tool_url.includes(domain)))
+        // Optionally, you can also filter out assignments linked to classic quizzes by checking assignment.quiz_id, if you want, but not strictly necessary
+      );
+
+      // % students submitting any "other" assignment (across all such assignments)
+      let totalStudentOtherAssignSubs = 0;
+      for (let i = 0; i < otherAssignments.length; i++) {
+        const assign = otherAssignments[i];
+        console.log(`[${courseName}] Fetching submissions for assignment "${assign.name}" (${i + 1} of ${otherAssignments.length})`);
+        const subs = await fetchAllAssignmentSubmissions(courseId, assign.id);
+        const subStudentIds = new Set(subs.map(s => s.user_id).filter(id => studentIds.includes(id)));
+        totalStudentOtherAssignSubs += subStudentIds.size;
+      }
+      let pctAnsweredOtherAssignments = (otherAssignments.length && studentIds.length)
+        ? ((totalStudentOtherAssignSubs / (studentIds.length * otherAssignments.length)) * 100).toFixed(1)
         : "N/A";
 
       // --- Discussions (Published Only) ---
@@ -249,6 +278,8 @@ async function fetchPageBody(courseId, pageUrl) {
         '% Students Answering Quizzes': pctAnsweredQuizzes,
         'New Quizzes': publishedNewQuizzes.length,
         '% Students Answering New Quizzes': pctAnsweredNewQuizzes,
+        'Other Assignments': otherAssignments.length,
+        '% Students Submitting Other Assignments': pctAnsweredOtherAssignments,
         'Discussions': discussions.length,
         '% Students Replying in Discussions': pctAnsweredDiscussions,
         'Module Pages': pageCount,
@@ -270,6 +301,8 @@ async function fetchPageBody(courseId, pageUrl) {
         '% Students Answering Quizzes': 'ERR',
         'New Quizzes': 'ERR',
         '% Students Answering New Quizzes': 'ERR',
+        'Other Assignments': 'ERR',
+        '% Students Submitting Other Assignments': 'ERR',
         'Discussions': 'ERR',
         '% Students Replying in Discussions': 'ERR',
         'Module Pages': 'ERR',
