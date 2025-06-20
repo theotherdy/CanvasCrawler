@@ -184,6 +184,11 @@ async function fetchPageBody(courseId, pageUrl) {
         'quiz-lti-dub-prod.instructure.com'
       ];
       const assignments = await fetchAllAssignments(courseId);
+      assignments.forEach(a => {
+        if (a.published && (a.submission_types || []).includes('external_tool')) {
+          console.log(`[Assignment] ${a.name}: ${a.external_tool_url}`);
+        }
+      });
       const publishedNewQuizzes = assignments.filter(a =>
         a.published &&
         (a.submission_types || []).includes('external_tool') &&
